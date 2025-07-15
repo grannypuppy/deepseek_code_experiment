@@ -9,7 +9,9 @@ def load_data_from_jsonl(file_path: str) -> Dataset:
     data = []
     with open(file_path, 'r', encoding='utf-8') as f:
         for line in f:
-            data.append(json.loads(line))
+            # 检查行是否为空，避免json解析错误
+            if line.strip():
+                data.append(json.loads(line))
     return Dataset.from_list(data)
 
 # --- SFT (监督微调) 预处理 ---
@@ -22,22 +24,21 @@ def preprocess_for_sft(examples, tokenizer: AutoTokenizer):
     inputs = []
     labels = []
 
+    # 确保'src_code'和'tgt_code'存在
+    if 'src_code' not in examples or 'tgt_code' not in examples:
+        return {"input_ids": [], "labels": []}
+
     for src, tgt in zip(examples['src_code'], examples['tgt_code']):
-        # 1. 对源和目标代码分别进行编码，并添加特殊token
         src_tokenized = tokenizer(src, truncation=True, max_length=512)
         tgt_tokenized = tokenizer(tgt, truncation=True, max_length=512)
 
-        # 2. 拼接源和目标的token ID
         input_ids = src_tokenized['input_ids'] + tgt_tokenized['input_ids']
         
-        # 3. 创建标签，将源语言部分的标签设为-100，这样损失函数会忽略它们
         src_labels = [-100] * len(src_tokenized['input_ids'])
         tgt_labels = tgt_tokenized['input_ids']
         
-        # 4. 拼接标签
         label_ids = src_labels + tgt_labels
         
-        # 5. 再次进行截断，确保总长度不超过模型限制
         if len(input_ids) > tokenizer.model_max_length:
             input_ids = input_ids[:tokenizer.model_max_length]
             label_ids = label_ids[:tokenizer.model_max_length]
@@ -45,8 +46,6 @@ def preprocess_for_sft(examples, tokenizer: AutoTokenizer):
         inputs.append(input_ids)
         labels.append(label_ids)
 
-    # 返回结果，注意需要padding
-    # Trainer会自动处理padding，我们只需要返回token id列表
     return {"input_ids": inputs, "labels": labels}
 
 # --- MLM (掩码语言模型) 预处理 ---
@@ -56,7 +55,9 @@ def preprocess_for_mlm(examples):
     我们只将src_code和tgt_code拼接成一个大的文本语料库。
     真正的“掩码”操作将由Trainer的DataCollator完成。
     """
-    # 将源和目标代码合并成一个文本流
-    # 使用换行符分隔，以保留代码的结构感
+    # 确保'src_code'和'tgt_code'存在
+    if 'src_code' not in examples or 'tgt_code' not in examples:
+        return {"text": []}
+        
     texts = [src + "\n" + tgt for src, tgt in zip(examples['src_code'], examples['tgt_code'])]
     return {"text": texts}

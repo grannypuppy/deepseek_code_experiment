@@ -4,5 +4,7 @@ datasets>=2.15.0
 peft>=0.9.0
 accelerate>=0.28.0
 torch>=2.0.0
-bitsandbytes>=0.41.0  # 如果需要用 8-bit/4-bit 量化加载模型
-scipy                 # PEFT 依赖
+bitsandbytes>=0.41.0
+scipy
+wandb>=0.16.0       # <-- 添加wandb库
+tqdm>=4.62.0        # <-- 添加tqdm库
